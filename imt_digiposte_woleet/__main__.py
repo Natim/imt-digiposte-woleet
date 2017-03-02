@@ -1,17 +1,23 @@
+from __future__ import absolute_import, print_function
 import argparse
 import csv
 import codecs
 import os
+import requests
 
+from .csv import CSVDialect
 from .files import files_lookup
 from .digiposte import create_account, upload_diploma
 
+DIGIPOSTE_BASE_URL = "https://api.interop.u-post.fr/api/v3"  # No trailing slash
 
 DEFAULT_SCHEMA_FILE = 'students.csv'
 DEFAULT_DIPLOMAS_DIR = 'diplomas/'
 DEFAULT_ROUTAGE_FILE = 'routage.csv'
-STUDENTS_FIELD_NAMES = ['ETAT_CIVIL', 'PRENOM_ELE', 'NOM_NAISSANCE', 'NUMERO', 'EMAIL_ELE']
-ROUTAGE_FIELD_NAMES = ['NUMERO', 'ROUTAGE']
+STUDENTS_FIELD_NAMES = ['ETAT_CIVIL', 'PRENOM_ELE', 'NOM_NAISSANCE',
+                        'NUMERO', 'DIPLOME_OBTENU', 'EMAIL_ELE']
+ROUTAGE_FIELD_NAMES = ['NUMERO', 'ROUTAGE', 'ETAT_CIVIL', 'PRENOM_ELE', 'NOM_NAISSANCE',
+                       'DIPLOME_OBTENU', 'EMAIL_ELE']
 DIPLOMA_EXT = '.pdf'
 RECEIPT_EXT = '.json'
 
@@ -24,17 +30,21 @@ def main(args=None):
                         type=str, default=DEFAULT_SCHEMA_FILE)
 
     parser.add_argument('--no-students', help='Do not create students account.',
-                        action="store_false")
+                        action="store_true")
 
     parser.add_argument('-r', '--routage-file',
                         help='Students digiposte account routage CSV file.',
                         type=str, default=DEFAULT_ROUTAGE_FILE)
 
+    parser.add_argument('-f', '--override',
+                        help='Override the routage file if already exist.',
+                        action="store_true")
+
     parser.add_argument('-d', '--diplomas-dir', help='Diploma directory.',
                         type=str, default=DEFAULT_DIPLOMAS_DIR)
 
     parser.add_argument('--no-upload', help='Do not upload diploma on digiposte.',
-                        action="store_false")
+                        action="store_true")
 
     args = parser.parse_args(args=args)
 
@@ -44,27 +54,55 @@ def main(args=None):
     if not digiposte_bearer_token:
         raise ValueError('Please expose the DIGIPOSTE_BEARER_TOKEN env variable')
 
-    routages = None
+    digiposte_session = requests.Session()
+    digiposte_session.headers.update(
+        {"Authorization": "Bearer {}".format(digiposte_bearer_token)})
 
-    if not args.no_students:
-        routages = []
-        with codecs.open(args.student_file, 'r', encoding='utf-8') as students_csv_file:
-            students_reader = csv.DictReader(students_csv_file, STUDENTS_FIELD_NAMES)
-            for student in students_reader:
-                student_routage = create_account(
-                    bearer_token=digiposte_bearer_token,
-                    partner_user_id=student['NUMERO'],
-                    first_name=student['PRENOM_ELE'],
-                    last_name=student['NOM_NAISSANCE'])
+    routages = []
+    with codecs.open(args.student_file, 'r', encoding='utf-8') as students_csv_file:
+        students_reader = csv.DictReader(students_csv_file,
+                                         dialect=CSVDialect(),
+                                         fieldnames=STUDENTS_FIELD_NAMES)
+        next(students_reader)  # Ignore first line
+        for student in students_reader:
+            if not args.no_students:
+                student_routage = create_account(digiposte_session, DIGIPOSTE_BASE_URL,
+                                                 partner_user_id=student['NUMERO'],
+                                                 first_name=student['PRENOM_ELE'],
+                                                 last_name=student['NOM_NAISSANCE'])
                 student["ROUTAGE"] = student_routage
                 routages.append(student)
 
+            print("{} {} - {}".format(student['PRENOM_ELE'],
+                                      student['NOM_NAISSANCE'],
+                                      student['NUMERO']))
+
     if not routages:
+        if not os.path.isfile(args.routage_file):
+            raise ValueError('Please provide a routage_file: {} not found.'.format(
+                args.routage_file))
+
         with codecs.open(args.routage_file, 'r', encoding='utf-8') as routage_csv_file:
-            routages = list(csv.DictReader(routage_csv_file, ROUTAGE_FIELD_NAMES))
+            routage_reader = csv.DictReader(routage_csv_file,
+                                            dialect=CSVDialect(),
+                                            fieldnames=ROUTAGE_FIELD_NAMES)
+            next(routage_reader)  # Ignore first line
+            routages = list(routage_reader)
+    else:
+        if os.path.isfile(args.routage_file) and not args.override:
+            raise ValueError('{} already exists. Please use -f if you want to override it.')
+        with codecs.open(args.routage_file, 'w', encoding='utf-8') as routage_csv_file:
+            writer = csv.DictWriter(routage_csv_file,
+                                    dialect=CSVDialect(),
+                                    fieldnames=ROUTAGE_FIELD_NAMES)
+            writer.writeheader()
+            for routage in routages:
+                writer.writerow(routage)
 
     if not args.no_upload:
         students_routages = {routage['NUMERO']: routage['ROUTAGE'] for routage in routages}
+        students_diploma_name = {routage['NUMERO']: routage['DIPLOME_OBTENU']
+                                 for routage in routages}
         students_diplomas = files_lookup(diplomas_dir,
                                          diploma_ext=DIPLOMA_EXT,
                                          receipt_ext=RECEIPT_EXT)
@@ -84,6 +122,7 @@ def main(args=None):
             print('Ignoring routages because missing diplomas: {}'.format(ignored_routages))
 
         for numero in students_codes:
-            upload_diploma(students_diplomas[numero],
-                           students_routages[numero],
-                           bearer_token=digiposte_bearer_token)
+            upload_diploma(digiposte_session, DIGIPOSTE_BASE_URL,
+                           diploma_name=students_diploma_name[numero],
+                           diploma_info=students_diplomas[numero],
+                           route_code=students_routages[numero])

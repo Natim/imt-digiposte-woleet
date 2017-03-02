@@ -15,7 +15,12 @@ def read_file(filename):
 README = read_file('README.rst')
 CHANGELOG = CONTRIBUTORS = ''
 
-REQUIREMENTS = []
+REQUIREMENTS = ['requests']
+ENTRY_POINTS = {
+    'console_scripts': [
+        'load_students = imt_digiposte_woleet.__main__:main'
+    ],
+}
 
 setup(name='imt-digiposte-woleet',
       version='0.1.0.dev0',
@@ -36,4 +41,5 @@ setup(name='imt-digiposte-woleet',
       packages=find_packages(),
       include_package_data=True,
       zip_safe=False,
-      install_requires=REQUIREMENTS)
+      install_requires=REQUIREMENTS,
+      entry_points=ENTRY_POINTS)
