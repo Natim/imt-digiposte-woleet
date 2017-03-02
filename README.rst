@@ -6,7 +6,7 @@ Create students accounts at digiposte and upload their diploma and woleet receip
 Install and run
 ---------------
 
-First of all `get an Oauth Bearer Token from Digiposte`_.
+First of all get an Oauth Bearer Token from Digiposte.
 
 Get your ``client_id`` and ``client_secret`` from Digiposte.
 
@@ -34,5 +34,5 @@ More Information
 ----------------
 
 * **Python**: 2.7+
-* Delivery is done using [Digiposte]()
-* Anchoring is done using [Woleet](https://woleet.io/) API.
+* Delivery is done using `Digiposte <https://secure.digiposte.fr/>`_
+* Anchoring is done using `Woleet <https://woleet.io/>`_ API.

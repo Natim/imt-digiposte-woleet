@@ -3,3 +3,4 @@ __pycache__/
 .venv/
 diplomas/*.json
 diplomas/*.pdf
+config.sh
