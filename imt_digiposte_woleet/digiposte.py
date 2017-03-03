@@ -7,11 +7,11 @@ DIGIPOSTE_DIPLOMA_TITLE = "Diplôme {} - IMT Atlantique-TB - 2017"
 DIGIPOSTE_DIPLOMA_TYPE = "DIPLOME"
 
 DIGIPOSTE_RECEIPT_TITLE = "Woleet receipt"
-DIGIPOSTE_RECEIPT_TYPE = "RECEIPT"
+DIGIPOSTE_RECEIPT_TYPE = "RECU_ANCRAGE"
 
 DIPLOMA_FILENAME_PREFIX = "diplome_doctorat_"
 RECEIPT_FILENAME_PREFIX = "recu_diplome_doctorat_"
-FILE_HASH_ALGORITHM = "SHA1"
+FILE_HASH_ALGORITHM = "SHA256"
 
 
 def create_account(session, base_url, partner_user_id, first_name, last_name):
@@ -20,9 +20,10 @@ def create_account(session, base_url, partner_user_id, first_name, last_name):
         "first_name": first_name,
         "last_name": last_name
     })
-    if response.status == 409:
-        print("The account has already been created ({}). "
+    if response.status_code == 409:
+        print("\nThe account has already been created ({}). "
               "If you don't have the route_code you are screwed.".format(partner_user_id))
+        return None
     else:
         response.raise_for_status()
     body = response.json()
@@ -36,7 +37,7 @@ def upload_diploma(session, base_url, diploma_info, route_code, diploma_name):
 
     with open(diploma_info['diploma'], 'rb') as diploma:
         content = diploma.read()
-        file_hash = hashlib.sha1(content).hexdigest()
+        file_hash = hashlib.sha256(content).hexdigest()
         file_size_bytes = len(content)
 
         diploma.seek(0)  # Rewind file for upload
@@ -60,13 +61,13 @@ def upload_diploma(session, base_url, diploma_info, route_code, diploma_name):
     # Upload receipt
     with open(diploma_info['receipt'], 'rb') as receipt:
         content = receipt.read()
-        file_hash = hashlib.sha1(content).hexdigest()
+        file_hash = hashlib.sha256(content).hexdigest()
         file_size_bytes = len(content)
 
         receipt.seek(0)  # Rewind file for upload
 
         receipt_data = {
-            "title": DIGIPOSTE_RECEIPT_TITLE + title_diploma,
+            "title": DIGIPOSTE_RECEIPT_TITLE + " - " + title_diploma,
             "type": DIGIPOSTE_RECEIPT_TYPE,
             "file_name": "{}{}".format(RECEIPT_FILENAME_PREFIX,
                                        os.path.basename(diploma_info['diploma'])),
@@ -74,9 +75,20 @@ def upload_diploma(session, base_url, diploma_info, route_code, diploma_name):
             "algo": FILE_HASH_ALGORITHM,
             "file_size": file_size_bytes
         }
-        print("Uploading receipt: {}".format(diploma_data))
+        print("Uploading receipt: {}".format(receipt_data))
         response = session.post('{}/document/certified'.format(base_url),
                                 data=receipt_data, files={"archive": receipt},
                                 headers=headers)
         response.raise_for_status()
     print('---')
+
+
+def get_student_url(session, base_url, partner_user_id):
+    headers = {"X-PartnerUserId": partner_user_id,
+               "Content-Type": "application/json"}
+
+    response = session.post("{}/user/customizationurl".format(base_url), headers=headers)
+    response.raise_for_status()
+
+    body = response.json()
+    return body.get('customization_url')

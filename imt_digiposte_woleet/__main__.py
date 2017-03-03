@@ -7,13 +7,14 @@ import requests
 
 from .csv import CSVDialect
 from .files import files_lookup
-from .digiposte import create_account, upload_diploma
+from .digiposte import create_account, upload_diploma, get_student_url
 
 DIGIPOSTE_BASE_URL = "https://api.interop.u-post.fr/api/v3"  # No trailing slash
 
 DEFAULT_SCHEMA_FILE = 'students.csv'
 DEFAULT_DIPLOMAS_DIR = 'diplomas/'
-DEFAULT_ROUTAGE_FILE = 'routage.csv'
+DEFAULT_ROUTAGE_FILE = 'students-routage.csv'
+DEFAULT_URL_FILE = 'students-urls.csv'
 STUDENTS_FIELD_NAMES = ['ETAT_CIVIL', 'PRENOM_ELE', 'NOM_NAISSANCE',
                         'NUMERO', 'DIPLOME_OBTENU', 'EMAIL_ELE']
 ROUTAGE_FIELD_NAMES = ['NUMERO', 'ROUTAGE', 'ETAT_CIVIL', 'PRENOM_ELE', 'NOM_NAISSANCE',
@@ -46,6 +47,13 @@ def main(args=None):
     parser.add_argument('--no-upload', help='Do not upload diploma on digiposte.',
                         action="store_true")
 
+    parser.add_argument('-u', '--url-file',
+                        help='Students digiposte account url CSV file.',
+                        type=str, default=DEFAULT_URL_FILE)
+
+    parser.add_argument('--no-urls', help='Do not grab the student URL.',
+                        action="store_true")
+
     args = parser.parse_args(args=args)
 
     digiposte_bearer_token = os.getenv("DIGIPOSTE_BEARER_TOKEN")
@@ -65,17 +73,22 @@ def main(args=None):
                                          fieldnames=STUDENTS_FIELD_NAMES)
         next(students_reader)  # Ignore first line
         for student in students_reader:
+            print("{} {} - {}".format(student['PRENOM_ELE'],
+                                      student['NOM_NAISSANCE'],
+                                      student['NUMERO']), end=' : ')
             if not args.no_students:
                 student_routage = create_account(digiposte_session, DIGIPOSTE_BASE_URL,
                                                  partner_user_id=student['NUMERO'],
                                                  first_name=student['PRENOM_ELE'],
                                                  last_name=student['NOM_NAISSANCE'])
-                student["ROUTAGE"] = student_routage
-                routages.append(student)
-
-            print("{} {} - {}".format(student['PRENOM_ELE'],
-                                      student['NOM_NAISSANCE'],
-                                      student['NUMERO']))
+                if student_routage:
+                    student["ROUTAGE"] = student_routage
+                    routages.append(student)
+                    print('OK - Routage {}'.format(student_routage))
+                else:
+                    print('NOK - Account already created')
+            else:
+                print('Creation skipped')
 
     if not routages:
         if not os.path.isfile(args.routage_file):
@@ -126,3 +139,18 @@ def main(args=None):
                            diploma_name=students_diploma_name[numero],
                            diploma_info=students_diplomas[numero],
                            route_code=students_routages[numero])
+
+    if not args.no_urls:
+        students_numeros = {routage['NUMERO']: routage for routage in routages}
+
+        for numero, student in students_numeros.items():
+            customization_url = get_student_url(digiposte_session, DIGIPOSTE_BASE_URL, numero)
+            student['CUSTOMIZATION_URL'] = customization_url
+
+        with codecs.open(args.url_file, 'w', encoding='utf-8') as customization_csv_file:
+            writer = csv.DictWriter(customization_csv_file,
+                                    dialect=CSVDialect(),
+                                    fieldnames=ROUTAGE_FIELD_NAMES + ['CUSTOMIZATION_URL'])
+            writer.writeheader()
+            for routage in routages:
+                writer.writerow(routage)

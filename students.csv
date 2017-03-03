@@ -1,4 +1,4 @@
-ETAT_CIVIL;PRENOM_ELE;NOM_NAISSANCE;NUMERO;EMAIL_ELE
-Monsieur;Rémy;Hubschouille;91191;hubschouille@restmail.net
-Madame ;Mariannolle;Toutan;222222;toutan@restmail.net
-Mademoizelle;Princesse;Mariouille;333333;mariouiille@restmail.net
+ETAT_CIVIL;PRENOM_ELE;NOM_NAISSANCE;NUMERO;DIPLOME_OBTENU;EMAIL_ELE
+Monsieur;Rémy;Hubschouille;691191;IG;hubschouille@restmail.net
+Madame ;Mariannolle;Toutan;6222222;MP ORCA;toutan@restmail.net
+Mademoizelle;Princesse;Mariouille;6333333;MSC IMP;mariouiille@restmail.net
