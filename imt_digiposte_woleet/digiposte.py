@@ -22,7 +22,8 @@ def create_account(session, base_url, partner_user_id, first_name, last_name):
     })
     if response.status_code == 409:
         print("\nThe account has already been created ({}). "
-              "If you don't have the route_code you are screwed.".format(partner_user_id))
+              "If you don't have the route_code you are screwed.\n{}".format(
+                  partner_user_id, response.json()))
         return None
     else:
         response.raise_for_status()
@@ -88,6 +89,10 @@ def get_student_url(session, base_url, partner_user_id):
                "Content-Type": "application/json"}
 
     response = session.post("{}/user/customizationurl".format(base_url), headers=headers)
+    if response.status_code == 403:
+        print('This student ({}) has already consumed her customization '
+              'url and created an account.'.format(partner_user_id))
+        return None
     response.raise_for_status()
 
     body = response.json()

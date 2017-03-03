@@ -143,14 +143,17 @@ def main(args=None):
     if not args.no_urls:
         students_numeros = {routage['NUMERO']: routage for routage in routages}
 
+        urls = []
         for numero, student in students_numeros.items():
             customization_url = get_student_url(digiposte_session, DIGIPOSTE_BASE_URL, numero)
-            student['CUSTOMIZATION_URL'] = customization_url
+            if customization_url:
+                student['CUSTOMIZATION_URL'] = customization_url
+                urls.append(student)
 
         with codecs.open(args.url_file, 'w', encoding='utf-8') as customization_csv_file:
             writer = csv.DictWriter(customization_csv_file,
                                     dialect=CSVDialect(),
                                     fieldnames=ROUTAGE_FIELD_NAMES + ['CUSTOMIZATION_URL'])
             writer.writeheader()
-            for routage in routages:
-                writer.writerow(routage)
+            for student in urls:
+                writer.writerow(student)
