@@ -11,15 +11,19 @@ def files_lookup(diplomas_dir, diploma_ext='.pdf', receipt_ext='.json'):
     receipts_numeros = set()
     files = defaultdict(dict)
 
-    for filename in iglob(os.path.join(diplomas_dir, "[0-9]*{}".format(diploma_ext))):
+    for filename in iglob(os.path.join(diplomas_dir, "*{}".format(diploma_ext))):
         numero = os.path.basename(filename).replace(diploma_ext, '')
-        pdf_numeros.add(numero)
-        files[numero]['diploma'] = filename
+        numero = numero.split('-', 1)[0]
+        if numero.isdigit():
+            pdf_numeros.add(numero)
+            files[numero]['diploma'] = filename
 
-    for filename in iglob(os.path.join(diplomas_dir, "[0-9]*{}".format(receipt_ext))):
+    for filename in iglob(os.path.join(diplomas_dir, "*{}".format(receipt_ext))):
         numero = os.path.basename(filename).replace(receipt_ext, '')
-        receipts_numeros.add(numero)
-        files[numero]['receipt'] = filename
+        numero = numero.split('-', 1)[0]
+        if numero.isdigit():
+            receipts_numeros.add(numero)
+            files[numero]['receipt'] = filename
 
     missing_receipts = pdf_numeros - receipts_numeros
 
