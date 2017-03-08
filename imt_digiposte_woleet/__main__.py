@@ -73,8 +73,9 @@ def main(args=None):
                                          fieldnames=STUDENTS_FIELD_NAMES)
         next(students_reader)  # Ignore first line
         for student in students_reader:
-            print("{} {} - {}".format(student['PRENOM_ELE'],
-                                      student['NOM_NAISSANCE'],
+            prenom = student['PRENOM_ELE'].split(',', 1)[0].strip()
+            print("{} {} - {}".format(prenom,
+                                      student['NOM_NAISSANCE'].upper(),
                                       student['NUMERO']), end=' : ')
             if not args.no_students:
                 student_routage = create_account(digiposte_session, DIGIPOSTE_BASE_URL,
