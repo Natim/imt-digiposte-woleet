@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
+from requests.exceptions import HTTPError
+from time import sleep
 import hashlib
 import os.path
 
@@ -15,19 +17,36 @@ FILE_HASH_ALGORITHM = "SHA256"
 
 
 def create_account(session, base_url, partner_user_id, first_name, last_name):
-    response = session.post("{}/user/partial".format(base_url), json={
+    body = {
         "partner_user_id": partner_user_id,
-        "first_name": first_name,
-        "last_name": last_name
-    })
+    }
+
+    if first_name:
+        body['first_name'] = first_name
+    if last_name:
+        body['last_name'] = last_name
+
+    response = session.post("{}/user/partial".format(base_url), json=body)
     if response.status_code == 409:
-        print("\nThe account has already been created ({}). "
-              "If you don't have the route_code you are screwed.\n{}".format(
-                  partner_user_id, response.json()))
-        return None
-    else:
+        headers = {'X-PartnerUserId': partner_user_id}
+        response = session.get("{}/memberships".format(base_url), headers=headers)
         response.raise_for_status()
-    body = response.json()
+        body = response.json()
+        return body['memberships'][0]['id']
+    else:
+        body = response.json()
+        try:
+            response.raise_for_status()
+        except HTTPError:
+            if response.status_code == 400:
+                if 'firstName' in body:
+                    return create_account(session, base_url, partner_user_id, None, last_name)
+                if 'lastName' in body:
+                    return create_account(session, base_url, partner_user_id, first_name, None)
+            print("\nHTTPError {} for {}.\n{}".format(
+                  response.status_code,
+                  partner_user_id, body))
+            return None
     return body['route_code']
 
 

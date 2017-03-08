@@ -9,7 +9,7 @@ from .csv import CSVDialect
 from .files import files_lookup
 from .digiposte import create_account, upload_diploma, get_student_url
 
-DIGIPOSTE_BASE_URL = "https://api.interop.u-post.fr/api/v3"  # No trailing slash
+DIGIPOSTE_BASE_URL = "https://api.digiposte.fr/api/v3"  # No trailing slash
 
 DEFAULT_SCHEMA_FILE = 'students.csv'
 DEFAULT_DIPLOMAS_DIR = 'diplomas/'
@@ -73,14 +73,14 @@ def main(args=None):
                                          fieldnames=STUDENTS_FIELD_NAMES)
         next(students_reader)  # Ignore first line
         for student in students_reader:
-            prenom = student['PRENOM_ELE'].split(',', 1)[0].strip()
-            print("{} {} - {}".format(prenom,
+            first_name = student['PRENOM_ELE'].split(',', 1)[0].strip()
+            print("{} {} - {}".format(first_name,
                                       student['NOM_NAISSANCE'].upper(),
                                       student['NUMERO']), end=' : ')
             if not args.no_students:
                 student_routage = create_account(digiposte_session, DIGIPOSTE_BASE_URL,
                                                  partner_user_id=student['NUMERO'],
-                                                 first_name=student['PRENOM_ELE'],
+                                                 first_name=first_name,
                                                  last_name=student['NOM_NAISSANCE'])
                 if student_routage:
                     student["ROUTAGE"] = student_routage
